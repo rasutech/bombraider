@@ -1,0 +1,373 @@
+<!DOCTYPE html>
+<head>
+<title>Lakshmi trying script after long time</title>
+<style>
+
+.colHead{
+display:table-row;
+}
+
+.grid_closed{
+width:31px;
+height:31px;
+background-image: url("layers_grass.png");
+text-align: center;
+vertical-align: middle;
+background-color: hsl(83,82,179);
+background-color: rgb(168,213,171);
+background-size: contain;
+background-repeat: no-repeat;
+border-style: dotted;
+border-width: 1px;
+display:table-cell;
+}
+
+.grid_hint{
+width:31px;
+height:31px;
+text-align: center;
+vertical-align: middle;
+background-color: hsl(87,88,126);
+background-color: rgb(89,179,105);
+background-size: cover;
+background-repeat: no-repeat;
+border-style: dotted;
+border-width: 1px;
+display:table-cell;
+}
+
+.grid_bombed{
+width:31px;
+height:31px;
+text-align: center;
+vertical-align: middle;
+background-image: url("bomb32_blue.png");
+background-color: hsl(5,160,115);
+background-color: rgb(204,61,40);
+background-size: cover;
+background-repeat: no-repeat;
+border-style: dotted;
+border-width: 1px;
+display:table-cell;
+}
+
+.grid_revealed{
+width:31px;
+height:31px;
+text-align: center;
+vertical-align: middle;
+background-image: url("bomb32_blue.png");
+background-color: hsl(13,96,135);
+background-color: rgb(188,128,99);
+background-size: cover;
+background-repeat: no-repeat;
+border-style: dotted;
+border-width: 1px;
+display:table-cell;
+}
+
+.grid_vacant {
+width:31px;
+height:31px;
+text-align: center;
+vertical-align: middle;
+background-color: hsl(87,88,126);
+background-color: rgb(89,179,105);
+background-size: cover;
+background-repeat: no-repeat;
+border-style: dotted;
+border-width: 1px;
+display:table-cell;
+}
+
+.grid_open {
+background-color: rgb(140,140,170);
+display: table;
+border-width: 2px;
+border-color:black;
+}
+
+.button {
+	background-color: rgb(48,78,52);
+	color: white;
+}
+
+.inputarea {
+	font: sans-serif;
+	color: rgb(48,78,52);
+	background-color: white;
+	border-color:  rgb(48,78,52);
+	border: dashed;
+	border-width: 1px;
+}
+
+</style>
+<script language="javascript">
+var DEBUG=false;
+var verboseStr = '';
+var totalBombs = 0;
+var mineArray;
+var indexArray;
+var indexCounter = 0;
+var mineM = 0;
+var mineField = 0;
+var mineN = 0;
+
+function renderGame()
+{
+	if ( ( document.getElementById('bombcount').value == '' || isNaN(document.getElementById('bombcount').value) )
+		|| ( document.getElementById('minedim').value == '' || isNaN(document.getElementById('minedim').value) ) )
+		alert('Grid Size and Bomb Count cannot be Empty and should have a Numeric value');
+
+	if (indexArray && indexArray.length != 0) clearField();
+
+	totalBombs =  parseInt(document.getElementById('bombcount').value);
+	mineField = parseInt(document.getElementById('minedim').value);
+
+	mineField = mineField * mineField;
+	if ( totalBombs > 0 && totalBombs < mineField )
+	{
+        mineArray = new Array();
+        indexArray = new Array();
+		mineM = parseInt(document.getElementById('minedim').value);
+		mineN = mineM;
+		var columnContainer;
+		try {
+			for(var i=0;i<mineM;i++) {
+				mineArray[i] = new Array();
+				columnContainer = document.createElement('div');
+				columnContainer.className = "colHead";
+				document.getElementById('minefield').appendChild(columnContainer);
+				for (var j = 0; j < mineN; j++) {
+					myElement = document.createElement('div');
+					myElement.className="grid_closed";					
+					myElement.xIndex = i;
+					myElement.yIndex = j;
+					myElement.bombCell = false;
+					myElement.onclick=mineStep;
+					myElement.oncontextmenu=markMine;
+					mineArray[i][j] = myElement;
+					columnContainer.appendChild(myElement);
+					indexArray[indexCounter++] = i + "-" + j;
+					}		
+				}		
+			initBombs();
+
+		}
+		catch(e) {alert(e.message)}
+		
+	}
+	else
+	{
+		alert('The Number of Bombs should be less than ' + mineField);
+	}
+}
+
+function markMine() {
+	var srcObj = event.srcElement;
+	srcObj.innerText = "B";
+}
+function mineStep() {
+	if(DEBUG)
+		alert('Entered x='+event.srcElement.xIndex + ';y=' + event.srcElement.yIndex);
+	var srcObj = event.srcElement;
+	var counter = 0;
+	var xIndex = srcObj.xIndex;
+	var yIndex = srcObj.yIndex;
+	var neighbours;
+	if(  srcObj.bombCell == true ) {
+		srcObj.className = "grid_bombed";
+		setGameOver(true);
+	} 
+	else {
+		if (findAndOpen(srcObj.xIndex,srcObj.yIndex) == 0)
+		invokeFindAndOpen(srcObj.xIndex,srcObj.yIndex);
+	}	
+	checkGameStatus();
+
+	//printVerbose();
+	
+}
+
+function checkGameStatus() {
+	var closedCount = 0;
+	var openCount = 0;
+	var totalCount = 0;
+	for (var i = 0; i < mineM; i++) {
+		for (var j = 0; j < mineN; j++) {
+			if ( mineArray[i][j].bombCell && mineArray[i][j].className == 'grid_closed' ) 
+				closedCount++;
+			else if (mineArray[i][j].className == 'grid_hint' || mineArray[i][j].className == 'grid_vacant')
+				openCount++;
+			totalCount++;
+		}
+	}
+	if (closedCount == totalBombs && (totalCount == (openCount + closedCount))) { 
+		setGameOver(false); // Not an Abnormal Closure to Game
+		alert('Congrats!!! You Successfully Identified all ' + totalBombs + ' Bombs in Mine Field');
+	}
+}
+
+function invokeFindAndOpen(xIndex,yIndex) {
+	var neighbours;
+	var newX;
+	var newY;
+	var counter = 0;
+	neighbours = getNeighbours(xIndex,yIndex);
+	for (var i = 0; i < neighbours.length; i++) {
+			newX = parseInt(neighbours[i].split('-')[0]);
+			newY = parseInt(neighbours[i].split('-')[1]);
+			counter = findAndOpen(newX,newY);
+			if ( counter != 0 ) continue;
+			else
+				invokeFindAndOpen(newX,newY);		
+	}
+}
+
+function getNeighbours(m,n) {
+	var neighbours = new Array();
+	var index = 0;
+	if ( m > 0 ) // 1. Ground Zero
+	neighbours[index++] = (m-1) + '-' + n;
+
+	if ( m > 0 && (n+1) < mineN ) // 2. 45 Degree
+	neighbours[index++] = (m-1) + '-' + (n + 1);
+
+	if ( (n+1) < mineN ) // 3. 90 Degrees
+	neighbours[index++] = m + '-' + (n+1);
+
+	if ( (m+1) < mineM && (n+1) < mineN ) //4. 135 Degrees
+	neighbours[index++] = (m+1) + '-' + (n+1);
+
+	if ( (m+1) < mineM ) //5. 180 Degrees
+	neighbours[index++] = (m+1) + '-' + n;
+
+	if ( (m+1) < mineM && n > 0 ) //6. 225 Degrees
+	neighbours[index++] = (m+1) + '-' + (n-1);
+
+	if ( n > 0 ) //7. 270 Degrees
+	neighbours[index++] = m + '-' + (n-1);
+
+	if ( m > 0 && n > 0 ) //8. 315 Degrees
+	neighbours[index++] = (m-1) + '-' + (n -1);
+
+	return neighbours;
+}
+
+function setGameOver(abnormal) {
+	for (var i = 0; i < mineM; i++) {
+		for (var j = 0; j < mineN; j++) {
+			if ( mineArray[i][j].bombCell && mineArray[i][j].className == 'grid_closed' && abnormal ) 
+				mineArray[i][j].className = "grid_revealed";
+
+			mineArray[i][j].onclick = '';
+		}
+	}
+}
+
+function findAndOpen(m,n) {
+	var counter = 0;
+	var neighbours;
+
+	if ( m < 0 || n < 0 || m >= mineM || n >= mineN || mineArray[m][n].className != 'grid_closed') return -1;
+		//verboseStr += 'Index m=' + m + '#n=' + n + 'mineArray[m][n].bombCell=' + mineArray[m][n].bombCell + '\n';
+	var newX;
+	var newY;
+	var counter = 0;
+	neighbours = getNeighbours(m,n);
+	for (var i = 0; i < neighbours.length; i++) {
+			newX = parseInt(neighbours[i].split('-')[0]);
+			newY = parseInt(neighbours[i].split('-')[1]);
+			if ( mineArray[newX][newY].bombCell ) counter++;			
+	}
+
+	if (counter > 0 ) {
+		mineArray[m][n].className = "grid_hint";
+		mineArray[m][n].innerText = counter;
+		mineArray[m][n].onclick = '';
+	}
+	else {
+		mineArray[m][n].className = "grid_vacant";
+		mineArray[m][n].innerText = counter;
+		mineArray[m][n].onclick = '';		
+	}
+	return counter;
+}
+
+function initBombs() {	
+	var randomNow;
+	var bombCounter = 0;
+	var iIndex = 0;
+	var jIndex = 0;
+	var indexPos;
+	while(bombCounter != totalBombs ) {
+		randomNow = Math.floor(Math.random()*mineField*10);
+		if ( randomNow < mineField ) {
+			indexPos = indexArray[randomNow];
+						if(DEBUG)
+						alert(randomNow + 'VAL' + indexArray[randomNow] + "==" + indexPos.indexOf('-'));
+
+			if (indexPos.indexOf('-') != -1 ) {
+				iIndex = parseInt(indexPos.split('-')[0]);
+				jIndex = parseInt(indexPos.split('-')[1]);
+				indexArray[randomNow] = '#';
+				if ( mineArray[iIndex][jIndex] && mineArray[iIndex][jIndex].bombCell == false ) {
+					mineArray[iIndex][jIndex].bombCell = true;
+					bombCounter++;
+									if (DEBUG) alert('iIndex=' +iIndex + '#jIndex=' + jIndex + ' #BC=' + bombCounter);
+									//verboseStr += 'iIndex=' +iIndex + '#jIndex=' + jIndex + ' #BC=' + bombCounter + '\n';
+
+				}
+			}
+				
+		}		
+	}
+	
+}
+
+function printVerbose()
+{
+	document.getElementById('verboseFld').value = verboseStr;
+}
+
+function clearField() {
+    var topLevel = document.getElementById('minefield');
+    var colHead;
+    for (var i = mineN - 1; i >= 0; i--) {
+        colHead = topLevel.childNodes[i];
+        for (var j = mineN - 1; j >= 0; j--) {
+            colHead.removeChild(mineArray[i][j]);
+        }
+        topLevel.removeChild(colHead);
+        mineArray[i].length = 0;
+    }
+    mineArray.length = 0;
+    indexArray.length = 0;
+    indexCounter = 0;
+}
+</script>
+</head>
+<body>
+<form id="trial">
+<table class="inputarea">
+	<tr>
+		<td><span>Grid Size</span></td>
+		<td><input class="button"  type="text" id="minedim" size="5" value="5" required/></td>
+	<tr>
+	<tr>	
+		<td><span>Bomb Count</span></td>
+		<td><input class="button" type="text" id="bombcount" size="5" value="5" required/></td>
+	</tr>
+	<tr>
+	<td><input type="button" class="button" value="Set Bomb Count" onclick="renderGame();"/></td>
+	<td><input type="button" class="button" value="Clear Mine Field" onclick="clearField();"/></td>
+	</tr>	
+</table>
+
+</form>
+<div id="minefield" class="grid_open"></div>
+<!--
+<textarea id="verboseFld" style="width:400px;height:200px;"></textarea>
+-->
+</body>
+</html>
